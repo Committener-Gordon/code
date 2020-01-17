@@ -7,10 +7,12 @@ import numpy as np
 import os, sys
 import cv2
 import glob
+import re
+
 
 RESIZECONSTANT = 600
 DETECTIONRADIUS = 200 
-PATH_TO_COW_DATA = "/cow_data/Kamerasicherung1/mx10-11-175-103/10_11_175_103/"
+PATH_TO_COW_DATA = "/cow-data/Kamerasicherung1/Kamerasicherung1/mx10-11-175-103/10_11_175_103/"
 FRAME_PREFIX = "out-"
 
 def extractFrames(inputFile, directory):
@@ -64,10 +66,6 @@ def getCowBoxes(box_ids, scores, bboxes, classes, resizeRatio):
                 print("Nice, found a " + classes[myid] + " and I'm " + str(myscore) + " sure")
                 #detected.append(np.dot(bboxes[0][i].asnumpy(), resizeRatio))
                 bbox = bboxes[0][i].asnumpy()
-                
-                # use this if you want fixed size boxes for the cow
-                #x = int(((bbox[0] + bbox[2]) / 2) * resizeRatio)
-                #y = int(((bbox[1] + bbox[3]) / 2) * resizeRatio)
 
                 detected.append(bbox * resizeRatio)
             else:
@@ -89,31 +87,44 @@ def extractCowsFromFrames(detected, directory, padding):
         if i < 10:
             fileSuffix = "0" + fileSuffix
         for j in range(len(detected)):
-            xFrom = int(int(detected[j][1]))
-            xTo = int(detected[j][3])
-            yFrom = int(detected[j][0])
-            yTo = int(detected[j][2])
-
-            xFrom = max(0, xFrom - padding)
-            xTo = min(len(img), xTo + padding)
-            yFrom = max(0, yFrom - padding)
-            yTo = min(len(img[0]), yTo + padding)
-
+            x = int((detected[j][1] + detected[j][3]) / 2)
+            y = int((detected[j][0] + detected[j][2]) / 2)
+            
+            if x < 200:
+                xFrom, xTo = 0, 400
+            elif x > len(img) - 200:
+                xFrom, xTo = len(img) - 400, len(img)
+            else:
+                xFrom, xTo = x-200, x+200
+            
+            
+            if y < 200:
+                yFrom, yTo = 0, 400
+            elif x > len(img[0]) - 200:
+                yFrom, yTo = len(img[0]) - 400, len(img[0])
+            else:
+                yFrom, yTo = y-200, y+200
+            
+           
             cow = img[xFrom:xTo, yFrom:yTo]
             cv2.imwrite(directory + "/c" + str(j) + "img" + fileSuffix + ".jpg", cow)
+            
+    for i in range(len(detected)):
+        assembleVideoFromFrames(directory, "c" + str(i) + "img")
+        deleteVideoFrames(directory, "c" + str(i) + "img")
 
 def deleteVideoFrames(directory, prefix):
     for filePath in glob.glob(directory + "/" + prefix + "*.jpg"):
         os.remove(filePath)
 
 # This function can assemble a video from the cropped frames. Make sure that the dimensions of the frames are divisible by 2.
-#def assembleVideoFromFrames(directory, prefix):
-    #(
-        #ffmpeg
-        #.input(directory + "/" + prefix + "*.jpg", pattern_type="glob", framerate=2)
-        #.output(prefix + ".mp4")
-        #.run()
-    #)
+def assembleVideoFromFrames(directory, prefix):
+    (
+        ffmpeg
+        .input(directory + "/" + prefix + "*.jpg", pattern_type="glob", framerate=2)
+        .output(directory + "/" + prefix + ".mp4", pix_fmt='gray')
+        .run()
+    )
 
 
 
@@ -134,27 +145,29 @@ for firstLvlDir in firstLvlDirs:
 
         pathGlobal = os.path.join(PATH_TO_COW_DATA, directory)
         for filePath in glob.glob(pathGlobal + "/M*.jpg"):
+            pattern = re.compile("^M[0-9]+$")
             filename = os.path.basename(filePath)[slice(0, -4)]
-            frameDirectory = directory + "/" + filename
+            if pattern.match(filename):
+                frameDirectory = directory + "/" + filename
 
-            print(frameDirectory)
-            if not os.path.exists(frameDirectory):
-                os.mkdir(frameDirectory)
+                print(frameDirectory)
+                if not os.path.exists(frameDirectory):
+                    os.mkdir(frameDirectory)
 
-            resizeRatio = extractFrames(filePath, frameDirectory)
-            detectionFrame = frameDirectory + "/" + FRAME_PREFIX + "001.jpg"
-            x, orig_img = data.transforms.presets.rcnn.load_test(detectionFrame)
+                resizeRatio = extractFrames(filePath, frameDirectory)
+                detectionFrame = frameDirectory + "/" + FRAME_PREFIX + "001.jpg"
+                x, orig_img = data.transforms.presets.rcnn.load_test(detectionFrame)
 
-            # the model returns the predicted class ids, confidence scores and bounding boxes
-            box_ids, scores, bboxes = net(x)
-            classes = net.classes
-            detectedCows = getCowBoxes(box_ids, scores, bboxes, classes, resizeRatio)
-            if len(detectedCows) > 0:
-                extractCowsFromFrames(detectedCows, frameDirectory, 100)
-            deleteVideoFrames(frameDirectory, FRAME_PREFIX)
+                # the model returns the predicted class ids, confidence scores and bounding boxes
+                box_ids, scores, bboxes = net(x)
+                classes = net.classes
+                detectedCows = getCowBoxes(box_ids, scores, bboxes, classes, resizeRatio)
+                if len(detectedCows) > 0:
+                    extractCowsFromFrames(detectedCows, frameDirectory, 100)
+                deleteVideoFrames(frameDirectory, FRAME_PREFIX)
 
-            if not os.listdir(frameDirectory):
-                os.rmdir(frameDirectory)
+                if not os.listdir(frameDirectory):
+                    os.rmdir(frameDirectory)
 
         if not os.listdir(directory):
                 os.rmdir(directory)
