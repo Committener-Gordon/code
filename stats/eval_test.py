@@ -8,6 +8,7 @@ import numpy as np
 from data import Data
 import random
 from tabulate import tabulate
+from matplotlib import pyplot as plt
 
 
 def tabulate2Clusters(labels, separator):
@@ -27,7 +28,7 @@ input_dims = (20, 400, 400, 1)
 inputs = Input(shape=input_dims)
 
 
-loaded_model = load_model("model.h5")
+loaded_model = load_model("model_2conv_viz.h5")
 #loaded_model.summary()
 
 #loaded_model.layers.pop()
@@ -47,27 +48,30 @@ used_data = []
 X = []
 calved_count = 0
 random_count = 0
+ground_truth = []
 
 for file in data_set:
-	if random.random() < 0.5:
-		out, _ = (
-    		ffmpeg
-    		.input(file)
-    		.output('pipe:', format='rawvideo', pix_fmt='gray')
-    		.run(quiet=True)
-		)
-		video = (
-			np
-			.frombuffer(out, np.uint8)
-			.reshape([20, 400, 400, 1])
-		)
-		X.append(video/255)	
-		used_data.append(file)
-		if "calving" in file:
-			calved_count += 1
-		else:
-			random_count += 1
-		print(file)
+    if random.random() < 0.5:
+        out, _ = (
+	        ffmpeg
+	        .input(file)
+	        .output('pipe:', format='rawvideo', pix_fmt='gray')
+	        .run(quiet=True)
+        )
+        video = (
+	        np
+	        .frombuffer(out, np.uint8)
+	        .reshape([20, 400, 400, 1])
+        )
+        X.append(video/255)	
+        used_data.append(file)
+        if "calving" in file:
+            calved_count += 1
+            ground_truth.append(0)
+        else:
+            random_count += 1
+            ground_truth.append(random.random())
+        print(file)
 
 #filename = "./vid/0301.mp4"
 
@@ -98,6 +102,8 @@ for i in range(len(labels)):
 print("KMeans")
 tabulate2Clusters(labels, calved_count)
 
+plt.scatter(y[:,0], y[:,1], c=ground_truth) 
+plt.show()
 
 #for i in range(1, 10):
     #for j in range(1, 10):
@@ -124,6 +130,7 @@ tabulate2Clusters(agg.labels_, calved_count)
 agg = AgglomerativeClustering(n_clusters=2, linkage="ward").fit(y)
 print("\n\nAgglomerative Clustering WARD")
 tabulate2Clusters(agg.labels_, calved_count)
+
 
 
 

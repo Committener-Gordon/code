@@ -1,6 +1,6 @@
 from numpy import array
 from keras.models import Sequential
-from keras.models import Model, load_model
+from keras.models import Model
 from keras.layers import LSTM, Input, Conv2D, Conv2DTranspose, MaxPooling2D, UpSampling2D, Dense, RepeatVector, TimeDistributed, Reshape
 from keras.utils import plot_model
 from keras.optimizers import RMSprop
@@ -13,30 +13,37 @@ def rgb2gray(rgb):
     return np.dot(rgb[...,:3], [0.2989, 0.5870, 0.1140])
 
 def get_autoencoder(inputs):                             
-    
-    loaded_model = load_model("model.h5")
-    #autoencoder.layers[0].set_weights(loaded_model.layers[3].get_weights())
-    
+
         
     #encoder
-    conv1 = TimeDistributed(Conv2D(16, (8, 8), strides=(4,4), activation='relu', padding='same'))(inputs)
-    pool1 = TimeDistributed(MaxPooling2D(pool_size=(4, 4)))(conv1) #25 x 25 x 16
+    conv1 = TimeDistributed(Conv2D(16, (9, 9), strides=(3,3), activation='relu', padding='same'))(inputs)
+    print(conv1.shape)
+    pool1 = TimeDistributed(MaxPooling2D(pool_size=(2, 2), padding='same'))(conv1) #25 x 25 x 16
+
+    conv2 = TimeDistributed(Conv2D(16, (9, 9), strides=(3,3), activation='relu', padding='same'))(pool1)
+    print(conv2.shape)
+    #pool2 = TimeDistributed(MaxPooling2D(pool_size=(2, 2), padding='same'))(conv2) #25 x 25 x 16
     
-    print(pool1.shape)
+    #print(pool2.shape)
     
-    reshape = Reshape((inputs.shape[1], 10000))(pool1)
+    reshape = Reshape((inputs.shape[1], 8464))(conv2)
     dense1 = TimeDistributed(Dense(100))(reshape)
     lstm1 = LSTM(100, return_sequences=True)(dense1)
-    lstm1small = LSTM(2, return_sequences=True)(lstm1)
+    lstmviz = LSTM(2, return_sequences=True)(lstm1)
     
-    lstm2 = LSTM(100, return_sequences=True)(lstm1small)
-    dense2 = TimeDistributed(Dense(10000))(lstm2)
-    reshape2 = Reshape((-1, 25, 25, 16))(dense2)
+    lstm2 = LSTM(100, return_sequences=True)(lstmviz)
+    dense2 = TimeDistributed(Dense(8464))(lstm2)
+    reshape2 = Reshape((-1, 23, 23, 16))(dense2)
      
         
-    conv5 = TimeDistributed(Conv2DTranspose(8, (8, 8), strides=(4,4), activation='relu', padding='same'))(reshape2) # 100 x 100 x 8
-    up2 = TimeDistributed(UpSampling2D((4,4)))(conv5) # 400 x 400 x 8
-    decoded = TimeDistributed(Conv2D(1, (3, 3), strides=(1,1), activation='relu', padding='same'))(up2)
+    #up2 = TimeDistributed(UpSampling2D((2,2)))(reshape2) # 400 x 400 x 8
+    conv5 = TimeDistributed(Conv2DTranspose(16, (9, 9), strides=(3,3), activation='relu', padding='same', output_padding=(0, 0)))(reshape2) # 100 x 100 x 8
+    print(conv5.shape)
+
+    up3 = TimeDistributed(UpSampling2D((2,2)))(conv5) # 400 x 400 x 8
+    conv6 = TimeDistributed(Conv2DTranspose(16, (9, 9), strides=(3,3), activation='relu', padding='same', output_padding=(0,0)))(up3) # 100 x 100 x 8
+    print(conv6.shape)
+    decoded = TimeDistributed(Conv2D(1, (3, 3), strides=(1,1), activation='relu', padding='same'))(conv6)
     
     #conv1 = TimeDistributed(Conv2D(32, (3, 3), strides=(1,1), activation='relu', padding='same'))(inputs)
     #pool1 = TimeDistributed(MaxPooling2D(pool_size=(2, 2)))(conv1) #200 x 200 x 32
@@ -75,12 +82,9 @@ print("Data amount: " + str(len(data)))
 print("###\n###")
 
 autoencoder = Model(inputs, get_autoencoder(inputs))
-#loaded_model = load_model("model.h5")
-#autoencoder.layers[0].set_weights(loaded_model.layers[3].get_weights())
-
 autoencoder.compile(loss='mean_squared_error', optimizer = RMSprop()) 
 autoencoder.summary()
 
-autoencoder.fit_generator(generator=data_generator, use_multiprocessing=True, workers=4, max_queue_size=4, epochs=1)
+autoencoder.fit_generator(generator=data_generator, use_multiprocessing=True, workers=4, max_queue_size=4, epochs=5)
 
-autoencoder.save("model_visualize.h5")
+autoencoder.save("model_2conv_viz.h5")

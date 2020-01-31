@@ -1,42 +1,40 @@
 from numpy import array
 from keras.models import Sequential
-from keras.models import Model, load_model
-from keras.layers import LSTM, Input, Conv2D, Conv2DTranspose, MaxPooling2D, UpSampling2D, Dense, RepeatVector, TimeDistributed, Reshape
+from keras.models import Model
+from keras.layers import LSTM, Input, Conv3D, Conv3DTranspose, MaxPooling3D, UpSampling3D, Dense, RepeatVector, TimeDistributed, Reshape
 from keras.utils import plot_model
 from keras.optimizers import RMSprop
 import ffmpeg
 import numpy as np
 from generator import MyGenerator
 from data import Data
+from matplotlib import pyplot as plt 
 
 def rgb2gray(rgb):
     return np.dot(rgb[...,:3], [0.2989, 0.5870, 0.1140])
 
 def get_autoencoder(inputs):                             
-    
-    loaded_model = load_model("model.h5")
-    #autoencoder.layers[0].set_weights(loaded_model.layers[3].get_weights())
-    
+
         
     #encoder
-    conv1 = TimeDistributed(Conv2D(16, (8, 8), strides=(4,4), activation='relu', padding='same'))(inputs)
-    pool1 = TimeDistributed(MaxPooling2D(pool_size=(4, 4)))(conv1) #25 x 25 x 16
+    conv1 = Conv3D(16, (5, 5, 5), strides=(1,5,5), activation='relu', padding='same')(inputs)
+    print(conv1.shape)
+    pool1 = MaxPooling3D(pool_size=(2, 2, 2))(conv1) #25 x 25 x 16
+    conv2 = Conv3D(8, (4, 4, 4), strides=(1,2,2), activation='relu', padding='same')(pool1)
+    pool2 = MaxPooling3D(pool_size=(2, 2, 2))(conv2) #25 x 25 x 16
+    conv3 = Conv3D(1, (4, 4, 4), strides=(1,1,1), activation='relu', padding='same')(pool2)
+    print(conv3.shape)
     
-    print(pool1.shape)
-    
-    reshape = Reshape((inputs.shape[1], 10000))(pool1)
-    dense1 = TimeDistributed(Dense(100))(reshape)
-    lstm1 = LSTM(100, return_sequences=True)(dense1)
-    lstm1small = LSTM(2, return_sequences=True)(lstm1)
-    
-    lstm2 = LSTM(100, return_sequences=True)(lstm1small)
-    dense2 = TimeDistributed(Dense(10000))(lstm2)
-    reshape2 = Reshape((-1, 25, 25, 16))(dense2)
-     
+    #reshape = Reshape((1, 25000))(pool2)
+    #dense1 = Dense(100)(reshape)
+    #dense2 = Dense(3125)(dense1)
+    #reshape2 = Reshape((-1, 25, 25, 1))(dense2)
         
-    conv5 = TimeDistributed(Conv2DTranspose(8, (8, 8), strides=(4,4), activation='relu', padding='same'))(reshape2) # 100 x 100 x 8
-    up2 = TimeDistributed(UpSampling2D((4,4)))(conv5) # 400 x 400 x 8
-    decoded = TimeDistributed(Conv2D(1, (3, 3), strides=(1,1), activation='relu', padding='same'))(up2)
+    conv5 = Conv3DTranspose(8, (4, 4, 4), strides=(2,2,2), activation='relu', padding='same')(conv3) # 100 x 100 x 8
+    up2 = UpSampling3D((1,2,2))(conv5) # 400 x 400 x 8
+    conv6 = Conv3DTranspose(16, (4, 4, 4), strides=(2,2,2), activation='relu', padding='same')(up2) # 100 x 100 x 8
+    #up3 = UpSampling3D((1,2,2))(conv6) # 400 x 400 x 8
+    decoded = Conv3DTranspose(1, (5, 5, 5), strides=(1, 5, 5), activation='relu', padding='same')(conv6)
     
     #conv1 = TimeDistributed(Conv2D(32, (3, 3), strides=(1,1), activation='relu', padding='same'))(inputs)
     #pool1 = TimeDistributed(MaxPooling2D(pool_size=(2, 2)))(conv1) #200 x 200 x 32
@@ -75,12 +73,37 @@ print("Data amount: " + str(len(data)))
 print("###\n###")
 
 autoencoder = Model(inputs, get_autoencoder(inputs))
-#loaded_model = load_model("model.h5")
-#autoencoder.layers[0].set_weights(loaded_model.layers[3].get_weights())
-
 autoencoder.compile(loss='mean_squared_error', optimizer = RMSprop()) 
 autoencoder.summary()
 
-autoencoder.fit_generator(generator=data_generator, use_multiprocessing=True, workers=4, max_queue_size=4, epochs=1)
+history = autoencoder.fit_generator(generator=data_generator, use_multiprocessing=True, workers=4, max_queue_size=4, epochs=5)
 
-autoencoder.save("model_visualize.h5")
+autoencoder.save("model_conv3d.h5")
+
+print("Accuracy")
+print(history.history['acc'])
+print("\n\n\n\nValidation Accuracy")
+print(history.history['val_acc'])
+print("\n\n\n\nLoss")
+print(history.history['loss'])
+print("\n\n\n\nValidation Loss")
+print(history.history['val_loss'])
+
+# Plot training & validation accuracy values
+plt.plot(history.history['acc'])
+plt.plot(history.history['val_acc'])
+plt.title('Model accuracy')
+plt.ylabel('Accuracy')
+plt.xlabel('Epoch')
+plt.legend(['Train', 'Test'], loc='upper left')
+plt.savefig("conv3d_acc.png")
+
+# Plot training & validation loss values
+plt.plot(history.history['loss'])
+plt.plot(history.history['val_loss'])
+plt.title('Model loss')
+plt.ylabel('Loss')
+plt.xlabel('Epoch')
+plt.legend(['Train', 'Test'], loc='upper left')
+plt.savefig("conv3d_loss.png")
+
