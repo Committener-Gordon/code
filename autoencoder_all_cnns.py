@@ -7,7 +7,7 @@ from keras.optimizers import RMSprop
 import ffmpeg
 import numpy as np
 from generator_frame import MyGenerator
-from data_fixed import Data
+#from data_fixed import Data
 from matplotlib import pyplot as plt 
 
 
@@ -143,6 +143,52 @@ def get_ae_25x25(inputs):
     decoded = Conv2DTranspose(1, (3, 3), strides=(1, 1), activation='relu', padding='same')(up4)
     return decoded
 
+def get_ae_100x100(inputs):
+    
+    conv1 = Conv2D(16, (3, 3), strides=(1,1), activation='relu', padding='same')(inputs)
+    pool2 = MaxPooling2D(pool_size=(2, 2))(conv1) #25 x 25 x 16
+    conv3 = Conv2D(8, (3, 3), strides=(1,1), activation='relu', padding='same')(pool2)
+    pool3 = MaxPooling2D(pool_size=(2, 2))(conv3) #25 x 25 x 16
+    conv5 = Conv2D(1, (3, 3), strides=(1,1), activation='relu', padding='same')(pool3)
+    
+    conv6 = Conv2DTranspose(8, (3, 3), strides=(1,1), activation='relu', padding='same')(conv5) # 100 x 100 x 8
+    up1 = UpSampling2D((2,2))(conv6) # 400 x 400 x 8
+    conv7 = Conv2DTranspose(16, (3, 3), strides=(1,1), activation='relu', padding='same')(up1) # 100 x 100 x 8
+    up2 = UpSampling2D((2,2))(conv7) # 400 x 400 x 8
+    decoded = Conv2DTranspose(1, (3, 3), strides=(1,1), activation='relu', padding='same')(up2) # 100 x 100 x 8
+    return decoded
+
+def get_ae_200x200(inputs):
+
+    conv1 = Conv2D(16, (3, 3), strides=(1,1), activation='relu', padding='same')(inputs)
+    conv2 = Conv2D(16, (3, 3), strides=(1,1), activation='relu', padding='same')(conv1)
+    pool2 = MaxPooling2D(pool_size=(2, 2))(conv2) #25 x 25 x 16
+    conv5 = Conv2D(1, (3, 3), strides=(1,1), activation='relu', padding='same')(pool2)
+    
+    conv6 = Conv2DTranspose(8, (3, 3), strides=(1,1), activation='relu', padding='same')(conv5) # 100 x 100 x 8
+    up1 = UpSampling2D((2,2))(conv6) # 400 x 400 x 8
+    conv7 = Conv2DTranspose(16, (3, 3), strides=(1,1), activation='relu', padding='same')(up1) # 100 x 100 x 8
+    decoded = Conv2DTranspose(1, (3, 3), strides=(1,1), activation='relu', padding='same')(conv7) # 100 x 100 x 8
+    return decoded
+
+def get_ae_50x50(inputs):
+    #encoder
+    conv1 = Conv2D(16, (3, 3), strides=(1,1), activation='relu', padding='same')(inputs)
+    pool1 = MaxPooling2D(pool_size=(2, 2))(conv1) #25 x 25 x 16
+    conv2 = Conv2D(16, (3, 3), strides=(1,1), activation='relu', padding='same')(pool1)
+    pool2 = MaxPooling2D(pool_size=(2, 2))(conv2) #25 x 25 x 16
+    conv3 = Conv2D(8, (3, 3), strides=(1,1), activation='relu', padding='same')(pool2)
+    pool3 = MaxPooling2D(pool_size=(2, 2))(conv3) #25 x 25 x 16
+    conv4 = Conv2D(1, (3, 3), strides=(1,1), activation='relu', padding='same')(pool3)
+    
+    conv7 = Conv2DTranspose(8, (3, 3), strides=(1,1), activation='relu', padding='same')(conv4) # 100 x 100 x 8
+    up2 = UpSampling2D((2,2))(conv7) # 400 x 400 x 8
+    conv8 = Conv2DTranspose(16, (3, 3), strides=(1,1), activation='relu', padding='same')(up2) # 100 x 100 x 8
+    up3 = UpSampling2D((2,2))(conv8) # 400 x 400 x 8
+    conv9 = Conv2DTranspose(16, (3, 3), strides=(1,1), activation='relu', padding='same')(up3) # 100 x 100 x 8
+    up4 = UpSampling2D((2,2))(conv9) # 400 x 400 x 8
+    decoded = Conv2DTranspose(1, (3, 3), strides=(1, 1), activation='relu', padding='same')(up4)
+    return decoded
 
 
 input_dims = (400, 400, 1)
@@ -160,43 +206,58 @@ data_generator = MyGenerator(train_data, batch_size=batch_size, dim=input_dims, 
 validation_generator = MyGenerator(validation_data, batch_size=batch_size, dim=input_dims, shuffle=shuffle)
 
 all_histories = []
-for i in range(6):
+for i in range(9):
+    autoencoder = None
     if i==0:
-        autoencoder = Model(inputs, get_ae_2x2(inputs))
+        print(0)
+        #autoencoder = Model(inputs, get_ae_2x2(inputs))
     elif i==1:
-        autoencoder = Model(inputs, get_ae_4x4(inputs))
+        print(1)
+        #autoencoder = Model(inputs, get_ae_4x4(inputs))
     elif i==2:
-        autoencoder = Model(inputs, get_ae_8x8(inputs))
+        print(2)
+        #autoencoder = Model(inputs, get_ae_8x8(inputs))
     elif i==3:
-        autoencoder = Model(inputs, get_ae_16x16(inputs))
+        print(3)
+        #autoencoder = Model(inputs, get_ae_16x16(inputs))
     elif i==4:
-        autoencoder = Model(inputs, get_ae_5x5(inputs))
+        print(4)
+        #autoencoder = Model(inputs, get_ae_5x5(inputs))
     elif i==5:
-        autoencoder = Model(inputs, get_ae_25x25(inputs))
-    autoencoder.compile(loss='mean_squared_error', optimizer = RMSprop()) 
-    autoencoder.summary()
+        print(5)
+        #autoencoder = Model(inputs, get_ae_25x25(inputs))
+    elif i==6:
+        print(6)
+        #autoencoder = Model(inputs, get_ae_100x100(inputs))
+    elif i==7:
+        #autoencoder = Model(inputs, get_ae_200x200(inputs))
+    elif i==8:
+        autoencoder = Model(inputs, get_ae_50x50(inputs))
+    if autoencoder is not None:
+        autoencoder.compile(loss='mean_squared_error', optimizer = RMSprop()) 
+        autoencoder.summary()
 
-    history = autoencoder.fit_generator(generator=data_generator, validation_data=validation_generator, use_multiprocessing=True, workers=16, max_queue_size=16, epochs=20)
-    
-    autoencoder.save("model_cnn_run" + str(i) + ".h5")
+        history = autoencoder.fit_generator(generator=data_generator, validation_data=validation_generator, use_multiprocessing=True, workers=16, max_queue_size=16, epochs=20)
+        
+        autoencoder.save("model_cnn_run" + str(i) + ".h5")
 
-    print("\n\n\n\nLoss")
-    print(history.history['loss'])
-    print("\n\n\n\nValidation Loss")
-    print(history.history['val_loss'])
+        print("\n\n\n\nLoss")
+        print(history.history['loss'])
+        print("\n\n\n\nValidation Loss")
+        print(history.history['val_loss'])
 
-    # Plot training & validation loss values
-    plt.plot(history.history['loss'])
-    plt.plot(history.history['val_loss'])
-    plt.title('Model loss')
-    plt.ylabel('Loss')
-    plt.xlabel('Epoch')
-    plt.ylim(top=0.25)
-    plt.legend(['Train', 'Test'], loc='upper left')
-    plt.savefig("cnn_loss_run" + str(i) + ".png")
-    plt.close()
+        # Plot training & validation loss values
+        plt.plot(history.history['loss'])
+        plt.plot(history.history['val_loss'])
+        plt.title('Model loss')
+        plt.ylabel('Loss')
+        plt.xlabel('Epoch')
+        plt.ylim(top=0.25)
+        plt.legend(['Train', 'Test'], loc='upper left')
+        plt.savefig("cnn_loss_run" + str(i) + ".png")
+        plt.close()
 
-    all_histories.append(history)
+        all_histories.append(history)
 
 print("#####\n#####\n#####ALL HISTORIES HERE!!!\n#####\n#####\n#####")
 for history in all_histories:
